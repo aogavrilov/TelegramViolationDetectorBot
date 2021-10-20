@@ -1,16 +1,31 @@
-# This is a sample Python script.
+from aiogram import Bot, Dispatcher, executor, types
+import configparser
+from Bot.Infrastructure.DataBase.Connector import database_connect
+from Bot.Telegram.Connection import bot_connect
+from Bot.Infrastructure.DataBase.commands import append_message, get_messages
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+dp = bot_connect()
 
 
-# Press the green button in the gutter to run the script.
+@dp.message_handler(commands="test1")
+async def cmd_test(message: types.Message):
+    await message.reply("Test1")
+
+
+@dp.message_handler()
+async def message_read(message: types.Message):
+    print(message.date.year * 12 + message.date.month * 31 + message.date.day * 24 + message.date.minute)
+    try:
+        if message.reply_to_message is not None and message.reply_to_message.text.lower() == "@violation_detect_bot":
+            messages = get_messages(connection, message.reply_to_message.from_user.id, message.reply_to_message.chat.id)
+            print(message.reply_to_message.text.lower(), messages)
+    except():
+        pass
+
+    append_message(connection, message.chat.id, message.from_user.id, message.text, 0,
+                   message.date.year * 12 + message.date.month * 31 + message.date.day * 24 + message.date.minute)
+
+
 if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    connection = database_connect()
+    executor.start_polling(dp, skip_updates=True)

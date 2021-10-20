@@ -2,7 +2,7 @@ from aiogram import Bot, Dispatcher, executor, types
 import configparser
 from Bot.Infrastructure.DataBase.Connector import database_connect
 from Bot.Telegram.Connection import bot_connect
-from Bot.Infrastructure.DataBase.commands import append_message, get_messages
+from Bot.Infrastructure.DataBase.commands import append_message, get_messages, add_chat, drop_chat
 
 dp = bot_connect()
 
@@ -10,6 +10,21 @@ dp = bot_connect()
 @dp.message_handler(commands="test1")
 async def cmd_test(message: types.Message):
     await message.reply("Test1")
+
+
+@dp.my_chat_member_handler()
+async def some_handler(my_chat_member: types.ChatMemberUpdated):
+    if my_chat_member.new_chat_member.user.username == "violation_detect_bot":
+        if my_chat_member.new_chat_member.status == "member":
+            add_chat(connection, my_chat_member.chat.id, my_chat_member.chat.title, 0)
+        if my_chat_member.new_chat_member.status == "administrator":
+            drop_chat(connection, my_chat_member.chat.id)
+            add_chat(connection, my_chat_member.chat.id, my_chat_member.chat.title, 1)
+        if my_chat_member.new_chat_member.status == "left":
+            drop_chat(connection, my_chat_member.chat.id)
+
+    # todo check username when he join to chat, check user by spamlist
+
 
 
 @dp.message_handler()

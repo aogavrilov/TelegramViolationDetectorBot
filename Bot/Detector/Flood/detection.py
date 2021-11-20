@@ -1,15 +1,7 @@
 import sys
 
 sys.path.insert(0, '/path/to/application/app/folder')
-from Bot.Detector.Flood.reaction import react_to_flood_message
-from Bot.Infrastructure.DataBase.Connector import database_connect
-from Bot.Infrastructure.DataBase.commands import get_count_of_messages_on_interval, get_chats, \
-    update_chat_average_messages
-from Bot.Telegram.Connection import bot_connect
-import time
-import datetime
-from collections import Counter
-import numpy as np
+
 from scipy import stats
 
 FLOOD_COMPARE_CONST = 10

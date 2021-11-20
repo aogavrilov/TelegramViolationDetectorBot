@@ -1,7 +1,7 @@
 from mysql.connector import Error
+#todo SQL Injactions Sequrity
 
-
-def show_databases(connection) -> str:
+def show_databases(connection) -> []:
     with connection.cursor() as cursor:
         command = "SHOW DATABASES"
         try:
@@ -40,7 +40,7 @@ def append_message(connection, chat_id: int, user_id: int, message: str, message
             return e
 
 
-def get_messages(connection, user_id, chat_id, limit=10, is_deleted=0):
+def get_messages(connection, user_id, chat_id, limit=10, is_deleted=0) -> ([], []):
     select_query = "SELECT message, message_id FROM messages WHERE user_id = " + str(user_id) + \
                           " AND chat_id = " + str(chat_id) +" AND is_deleted = " + str(is_deleted) + \
                    " ORDER BY id DESC LIMIT " + str(limit)
@@ -58,7 +58,7 @@ def get_messages(connection, user_id, chat_id, limit=10, is_deleted=0):
         return messages, ids
 
 
-def get_count_of_messages_on_interval(connection, chat_id, interval):
+def get_count_of_messages_on_interval(connection, chat_id, interval) -> int:
     select_query = "SELECT COUNT(*) FROM messages WHERE chat_id = " + str(chat_id) + " AND datetime < " + \
                    str(interval[1]) + " AND datetime > " + str(interval[0])
     try:
@@ -71,7 +71,7 @@ def get_count_of_messages_on_interval(connection, chat_id, interval):
         return 0
 
 
-def get_flood_status(connection, chat_id):
+def get_flood_status(connection, chat_id) -> str:
     select_query = "SELECT is_flood FROM chats WHERE chat_id = " + str(chat_id)
     try:
         with connection.cursor() as cursor:
@@ -84,7 +84,7 @@ def get_flood_status(connection, chat_id):
         return 0
 
 
-def update_flood_status(connection, chat_id, status):
+def update_flood_status(connection, chat_id, status) -> str:
     select_query = "UPDATE chats SET is_flood = " + str(status) + " WHERE chat_id = " + str(chat_id)
     try:
         with connection.cursor() as cursor:
@@ -96,7 +96,7 @@ def update_flood_status(connection, chat_id, status):
         return e
 
 
-def update_chat_average_messages(connection, chat_id, value):
+def update_chat_average_messages(connection, chat_id, value) -> str:
     command = "UPDATE chats SET mean_messages_in_3_minutes = " + str(value) + " WHERE chat_id = " + str(chat_id)
     with connection.cursor() as cursor:
         try:
@@ -108,7 +108,7 @@ def update_chat_average_messages(connection, chat_id, value):
             return e
 
 
-def update_message_is_flood_status(connection, chat_id, message_id, is_flood):
+def update_message_is_flood_status(connection, chat_id, message_id, is_flood) -> str:
     command = "UPDATE messages SET is_deleted = " + str(is_flood) + " WHERE chat_id = " + str(chat_id) + \
               " AND message_id = " + str(message_id)
     with connection.cursor() as cursor:

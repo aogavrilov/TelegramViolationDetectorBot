@@ -79,6 +79,7 @@ async def message_read(message: types.Message):
 if __name__ == '__main__':
     try:
         connection = database_connect()
+        print('Database connected')
     except:
-        pass
+        print('Database didn''t connect')
     executor.start_polling(dp, skip_updates=True)

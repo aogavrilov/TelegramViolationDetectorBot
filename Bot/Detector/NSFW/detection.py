@@ -1,3 +1,10 @@
+import pickle
+import string
+
+import sklearn
+import joblib
+
+'''
 import sys
 
 import torch
@@ -7,8 +14,6 @@ import numpy as np
 import re
 import scipy.sparse
 import pickle
-
-'''
 MODEL_PATH = 'Bot/Detector/NSFW/model/model_for_eval'
 model = torch.load(MODEL_PATH, map_location='cpu')
 model.eval()
@@ -22,7 +27,7 @@ with open(VOCABULARY_PATH, 'r', encoding='utf-8') as f:
 FREQUENCIES_PATH = 'Bot/Detector/NSFW/model/frequencies.txt'
 word2freq_ = np.loadtxt(FREQUENCIES_PATH)
 '''
-
+'''
 with open('Bot/Detector/NSFW/model/vocabulary.pkl', 'rb') as handle:
     word2id_ = pickle.load(handle)
 
@@ -91,3 +96,55 @@ def check_message_to_nsfw(message: str) -> bool:
     test_vector = vectorize_documents([tokenized_message], word2id_, word2freq_, scale=True)
     print(sigmoid(model.forward(torch.from_numpy(test_vector.toarray()).float())), test_vector.toarray())
     return sigmoid(model.forward(torch.from_numpy(test_vector.toarray()).float())) < 0.5
+'''
+
+from pymorphy2 import MorphAnalyzer
+import nltk
+from nltk.corpus import stopwords
+
+nltk.download('stopwords')
+
+stopwords = stopwords.words("russian")
+#with open('model/nbc_model.pkl', 'rb') as handle:
+#    model = pickle.load(handle)
+model = joblib.load('Bot/Detector/NSFW/model/nbc_model.pkl')
+
+def document2tokenized_document(document):
+    line = ""
+    for ch in string.punctuation:
+        document = document.replace(ch, "")
+    for word in document.lower().split():
+        if not word in stopwords:
+            line += word + " "
+    return line
+
+
+def tokenized_document2lemmatized_document_fast(document_tokenized):
+    line = ""
+    for word in document_tokenized.split():
+        line += morph.parse(word)[0].normal_form + " "
+    return line
+
+
+morph = MorphAnalyzer()
+
+
+class DocumentsLemmatize:
+    def __init__(self):
+        self.X = None
+        self.y = None
+
+    def fit(self, X, y):
+        return self
+
+    def transform(self, x):
+        x = document2tokenized_document(x)
+        x = tokenized_document2lemmatized_document_fast(x)
+        return [x]
+
+
+lemmatizer = DocumentsLemmatize()
+
+
+def check_message_to_nsfw(message: str) -> bool:
+    return model.predict(lemmatizer.transform(message)) == 0

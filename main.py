@@ -4,7 +4,7 @@ from Bot.Infrastructure.DataBase.Connector import database_connect
 from Bot.Telegram.Connection import bot_connect
 from Bot.Infrastructure.DataBase.commands import append_message, get_messages, add_chat, drop_chat, get_flood_status, \
     update_flood_status
-from Bot.Detector.Flood.detection import compare_messages_to_flood_detect, compare_message_to_flood_detect
+from Bot.Detector.Flood.FloodDetector import FloodDetector
 from Bot.Detector.Flood.reaction import react_to_flood_message
 from Bot.Detector.NSFW.detection import check_message_to_nsfw
 
@@ -38,19 +38,18 @@ async def message_read(message: types.Message):
         if message.reply_to_message is not None and message.text.lower() == "@violation_detect_bot":
             messages, ids = get_messages(connection, message.reply_to_message.from_user.id,
                                          message.reply_to_message.chat.id, is_deleted=0)  # todo check for flood
-            status, ids1 = compare_messages_to_flood_detect(dp, message.reply_to_message.chat.id, messages,
-                                                            ids)  # todo check images for flood
+            detector = FloodDetector()
+            status, ids1 = detector.compare_messages_to_flood_detect(messages)  # todo check images for flood
             if status:
                 for id1 in ids1:
                     await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])
-
-
-    except():
+    except:
         pass
     try:
         if get_flood_status(connection, message.chat.id):
             messages, ids = get_messages(connection, message.from_user.id, message.chat.id, 20)
-            status, ids1 = compare_message_to_flood_detect(dp, messages, message.text, percent=0.25)
+            detector = FloodDetector()
+            status, ids1 = detector.compare_message_to_flood_detect(messages, message.text, similarity_coefficient=0.25)
             if status:
                 for id1 in ids1:
                     await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])
@@ -58,7 +57,7 @@ async def message_read(message: types.Message):
         else:
             messages, ids = get_messages(connection, message.from_user.id,
                                          message.chat.id, 30)
-            status, ids1 = compare_message_to_flood_detect(dp, messages, message.text, percent=0.75)
+            status, ids1 = detector.compare_message_to_flood_detect(messages, message.text, similarity_coefficient=0.75)
             if status:
                 for id1 in ids1:
                     await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])

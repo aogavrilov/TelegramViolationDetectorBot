@@ -30,7 +30,6 @@ class FloodDetector:
     def _messages2words_counts(messages: array) -> (bool, array):
         """Build vocabulary, calculate word counts in messages and return indicator that vocabulary has only one word
         and words count """
-        print(messages)
         messages_concatenated = ' '.join(messages)
         word2id = {word: i for i, word in enumerate(set(messages_concatenated.split()))}
         words_count_in_messages = []
@@ -56,7 +55,7 @@ class FloodDetector:
             Return indicator is messages have flood messages and list of flood messages
         """
 
-        flood_ids = set()
+        flood_message_ids = set()
         messages_similarity = 0
         is_one_word_in_dictionary, words_count_in_messages = self._messages2words_counts(messages)
         if is_one_word_in_dictionary:
@@ -72,10 +71,10 @@ class FloodDetector:
                 else:
                     messages_similarity += correlation_between_messages
                 if messages_similarity > 0.8:
-                    flood_ids.add(i)
-                    flood_ids.add(j)
+                    flood_message_ids.add(i)
+                    flood_message_ids.add(j)
             if messages_similarity > self.FLOOD_COMPARE_CONST * similarity_coefficient:
-                return True, list(flood_ids)
+                return True, list(flood_message_ids)
         return False, []
 
     def compare_message_to_flood_detect(self,
@@ -96,7 +95,7 @@ class FloodDetector:
             Return indicator is messages have flood messages and list of flood messages
         """
 
-        flood_ids = set()
+        flood_message_ids = set()
         messages.insert(0, current_message)
         is_one_word_in_dictionary, words_count_in_messages = self._messages2words_counts(messages)
         messages_similarity = 0
@@ -112,7 +111,7 @@ class FloodDetector:
             else:
                 messages_similarity += correlation_between_messages
             if correlation_between_messages > 0.8:
-                flood_ids.add(i)
+                flood_message_ids.add(i)
         if messages_similarity > self.FLOOD_COMPARE_CONST * similarity_coefficient:
-            return True, list(flood_ids)
+            return True, list(flood_message_ids)
         return False, []

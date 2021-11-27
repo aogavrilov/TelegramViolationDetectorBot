@@ -1,5 +1,8 @@
 from aiogram import Bot, Dispatcher, executor, types
 import configparser
+
+from aiogram.types import ChatPermissions
+
 from Bot.Infrastructure.DataBase.Connector import database_connect
 from Bot.Telegram.Connection import bot_connect
 from Bot.Infrastructure.DataBase.commands import append_message, get_messages, add_chat, drop_chat, get_flood_status, \
@@ -7,6 +10,8 @@ from Bot.Infrastructure.DataBase.commands import append_message, get_messages, a
 from Bot.Detector.Flood.FloodDetector import FloodDetector
 from Bot.Detector.Flood.reaction import react_to_flood_message
 from Bot.Detector.NSFW.detection import check_message_to_nsfw
+from Bot.Detector.Corrector import Corrector
+from datetime import timedelta
 
 dp = bot_connect()
 
@@ -37,14 +42,48 @@ async def message_read(message: types.Message):
     try:
         if message.reply_to_message is not None and message.text.lower() == "@violation_detect_bot":
             messages, ids = get_messages(connection, message.reply_to_message.from_user.id,
-                                         message.reply_to_message.chat.id, is_deleted=0)  # todo check for flood
+                                         message.reply_to_message.chat.id, is_deleted=0)
+            delta = timedelta(
+                #days = 50,
+                #seconds = 27,
+                #microseconds = 10,
+                #milliseconds = 29000,
+                minutes=1,
+                #hours = 8,
+                #weeks = 2
+            )
+            #await dp.bot.ban_chat_member(message.reply_to_message.chat.id, message.reply_to_message.from_user.id, delta)
+
+            new_permissions = ChatPermissions(can_pin_messages=False,
+                                              can_send_polls=False,
+                                              can_send_media_messages=False,
+                                              can_invite_users=False,
+                                              can_send_other_messages=False,
+                                              can_send_messages=False,
+                                              can_change_info=False,
+                                              can_add_web_page_previews=False)
+            member = await dp.bot.get_chat_member(message.reply_to_message.chat.id,
+                                              message.reply_to_message.from_user.id)
+            print(member.status)
+            #message.reply_to_message.from_user.id
+            await dp.bot.restrict_chat_member(message.reply_to_message.chat.id,
+                                              message.reply_to_message.from_user.id,
+                                              until_date=delta,
+                                              permissions=new_permissions)
+            #                                              permissions=new_permissions,
+
+            print(message.reply_to_message.chat.id, message.reply_to_message.from_user.id)
+
             detector = FloodDetector()
-            status, ids1 = detector.compare_messages_to_flood_detect(messages)  # todo check images for flood
-            if status:
-                for id1 in ids1:
-                    await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])
-    except:
-        pass
+            is_flood_status, flood_messages_ids = detector.compare_messages_to_flood_detect(messages)  # todo check images for flood
+            if is_flood_status:
+                corrector = Corrector(connection, dp.bot, message.chat.id)
+                #await corrector._delete_messages(flood_messages_ids)
+                #for id1 in ids1:
+                #    await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])
+    except Exception as e:
+        print(e)
+
     try:
         if get_flood_status(connection, message.chat.id):
             messages, ids = get_messages(connection, message.from_user.id, message.chat.id, 20)

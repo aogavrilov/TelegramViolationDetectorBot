@@ -33,7 +33,7 @@ class FloodDetector:
         messages_concatenated = ' '.join(messages)
         word2id = {word: i for i, word in enumerate(set(messages_concatenated.split()))}
         words_count_in_messages = []
-        is_one_word_in_vocabulary = len(word2id) == 0
+        is_one_word_in_vocabulary = len(word2id) == 1
         for message in messages:
             words_count_in_message = np.zeros(len(word2id))
             for word in message.split():
@@ -98,12 +98,14 @@ class FloodDetector:
         flood_message_ids = set()
         messages.insert(0, current_message)
         is_one_word_in_dictionary, words_count_in_messages = self._messages2words_counts(messages)
+
         messages_similarity = 0
         if is_one_word_in_dictionary:
             result_ids = []
             for i in range(len(words_count_in_messages)):
                 result_ids.append(i)
             return True, result_ids
+
         for i in range(1, len(messages)):
             correlation_between_messages = stats.pearsonr(words_count_in_messages[i], words_count_in_messages[0])[0]
             if correlation_between_messages == np.nan:

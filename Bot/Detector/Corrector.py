@@ -1,6 +1,7 @@
 import datetime
 
 from aiogram.types import ChatPermissions
+from Bot.Infrastructure.DataBase.commands import write_incident, update_message_is_deleted_status
 
 
 class Corrector:
@@ -23,7 +24,8 @@ class Corrector:
                                  ban_sending_stickers: bool = False,
                                  ban_creating_polls: bool = False,
                                  ban_adding_chat_members: bool = False,
-                                 delete_messages: bool = False) -> None:
+                                 delete_messages: bool = False,
+                                 restrict_reason: str = "NSFW") -> None:
         Compare different actions to violation
 
         """
@@ -32,6 +34,7 @@ class Corrector:
         self.chat_id = chat_id
 
     async def _mute_user(self, user_id: int,
+                         restrict_reason: str,
                          time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(minutes=1)) -> None:
         """Block opportunity to send messages for time interval to chat"""
         new_permissions = ChatPermissions(can_send_messages=False)
@@ -39,51 +42,102 @@ class Corrector:
                                             user_id,
                                             permissions=new_permissions,
                                             until_date=time_before_restrictions_lift)
+        write_incident(self.connection,
+                       self.chat_id,
+                       user_id,
+                       applied_action="Mute user",
+                       incident_type=restrict_reason,
+                       incident_proofs="None")  # todo append incident_proofs
 
-    async def _kick_user(self, user_id: int) -> None:
+    async def _kick_user(self, user_id: int, restrict_reason: str) -> None:
         """Kick user from chat and add him to black list"""
         await self.bot.kick_chat_member(user_id)
+        write_incident(self.connection,
+                       self.chat_id,
+                       user_id,
+                       applied_action="Kick",
+                       incident_type=restrict_reason,
+                       incident_proofs="None")  # todo append incident_proofs
 
-    async def _delete_messages(self, message_ids: []) -> None:
+    async def _delete_messages(self, message_ids: [], restrict_reason: str) -> None:
         """Delete messages from chat"""
         for message_id in message_ids:
             await self.bot.delete_message(self.chat_id, message_id)
+            update_message_is_deleted_status(connection=self.connection, chat_id=self.chat_id, message_id=message_id, is_deleted=1)
+        write_incident(self.connection,
+                       self.chat_id,
+                       user_id=-1,
+                       applied_action="Delete Messages",
+                       incident_type=restrict_reason,
+                       incident_proofs="None")
 
     async def _ban_sending_media(self, user_id: int,
-                                 time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(minutes=1)) -> None:
+                                 restrict_reason: str,
+                                 time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(
+                                     minutes=1)) -> None:
         """Block opportunity to send media to chat"""
         new_permissions = ChatPermissions(can_send_media_messages=False)
         await self.bot.restrict_chat_member(self.chat_id,
                                             user_id,
                                             permissions=new_permissions,
                                             until_date=time_before_restrictions_lift)
+        write_incident(self.connection,
+                       self.chat_id,
+                       user_id,
+                       applied_action="Ban sending media",
+                       incident_type=restrict_reason,
+                       incident_proofs="None")
 
     async def _ban_sending_stickers(self, user_id: int,
-                                    time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(minutes=1)) -> None:
+                                    restrict_reason: str,
+                                    time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(
+                                        minutes=1)) -> None:
         """Block opportunity to send stickers to chat"""
         new_permissions = ChatPermissions(can_send_other_messages=False)
         await self.bot.restrict_chat_member(self.chat_id,
                                             user_id,
                                             permissions=new_permissions,
                                             until_date=time_before_restrictions_lift)
+        write_incident(self.connection,
+                       self.chat_id,
+                       user_id,
+                       applied_action="Ban sending stickers",
+                       incident_type=restrict_reason,
+                       incident_proofs="None")
 
     async def _ban_creating_polls(self, user_id: int,
-                                  time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(minutes=1)) -> None:
+                                  restrict_reason: str,
+                                  time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(
+                                      minutes=1)) -> None:
         """Block opportunity to create polls to chat"""
         new_permissions = ChatPermissions(can_send_polls=False)
         await self.bot.restrict_chat_member(self.chat_id,
                                             user_id,
                                             permissions=new_permissions,
                                             until_date=time_before_restrictions_lift)
+        write_incident(self.connection,
+                       self.chat_id,
+                       user_id,
+                       applied_action="Ban creating polls",
+                       incident_type=restrict_reason,
+                       incident_proofs="None")
 
     async def _ban_adding_chat_members(self, user_id: int,
-                                       time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(minutes=1)) -> None:
+                                       restrict_reason: str,
+                                       time_before_restrictions_lift: datetime.timedelta = datetime.timedelta(
+                                           minutes=1)) -> None:
         """Block opportunity to add new members to chat"""
         new_permissions = ChatPermissions(can_invite_users=False)
         await self.bot.restrict_chat_member(self.chat_id,
                                             user_id,
                                             permissions=new_permissions,
                                             until_date=time_before_restrictions_lift)
+        write_incident(self.connection,
+                       self.chat_id,
+                       user_id,
+                       applied_action="Ban adding new members",
+                       incident_type=restrict_reason,
+                       incident_proofs="None")
 
     async def react_to_violation(self, user_id: int = None,
                                  messages: [] = None,
@@ -94,7 +148,8 @@ class Corrector:
                                  ban_sending_stickers: bool = False,
                                  ban_creating_polls: bool = False,
                                  ban_adding_chat_members: bool = False,
-                                 delete_messages: bool = False) -> None:
+                                 delete_messages: bool = False,
+                                 restrict_reason: str = "NSFW") -> None:
         """
         Method for multi reaction on violation.
 
@@ -108,20 +163,26 @@ class Corrector:
         :param ban_creating_polls: indicator is user need not be able to create polls
         :param ban_adding_chat_members: indicator is user need not be able to add members
         :param delete_messages: indicator is messages need be deleted
+        :param restrict_reason: why implemented punishment
         :return: None
         """
         if messages is not None and delete_messages:
-            self._delete_messages(message_ids=messages)
+            await self._delete_messages(message_ids=messages, restrict_reason=restrict_reason)
         if user_id is not None:
             if kick_user:
-                self._kick_user(user_id=user_id)
+                await self._kick_user(user_id=user_id, restrict_reason=restrict_reason)
             if mute_user:
-                self._mute_user(user_id=user_id, time_before_restrictions_lift=time_before_restrictions_lift)
+                await self._mute_user(user_id=user_id, restrict_reason=restrict_reason,
+                                      time_before_restrictions_lift=time_before_restrictions_lift)
             if ban_sending_media:
-                self._ban_sending_media(user_id=user_id, time_before_restrictions_lift=time_before_restrictions_lift)
+                await self._ban_sending_media(user_id=user_id, restrict_reason=restrict_reason,
+                                              time_before_restrictions_lift=time_before_restrictions_lift)
             if ban_sending_stickers:
-                self._ban_sending_stickers(user_id=user_id, time_before_restrictions_lift=time_before_restrictions_lift)
+                await self._ban_sending_stickers(user_id=user_id, restrict_reason=restrict_reason,
+                                                 time_before_restrictions_lift=time_before_restrictions_lift)
             if ban_creating_polls:
-                self._ban_creating_polls(user_id=user_id, time_before_restrictions_lift=time_before_restrictions_lift)
+                await self._ban_creating_polls(user_id=user_id, restrict_reason=restrict_reason,
+                                               time_before_restrictions_lift=time_before_restrictions_lift)
             if ban_adding_chat_members:
-                self._ban_adding_chat_members(user_id=user_id, time_before_restrictions_lift=time_before_restrictions_lift)
+                await self._ban_adding_chat_members(user_id=user_id, restrict_reason=restrict_reason,
+                                                    time_before_restrictions_lift=time_before_restrictions_lift)

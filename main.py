@@ -1,19 +1,18 @@
-from aiogram import Bot, Dispatcher, executor, types
-import configparser
+import numpy as np
+from aiogram import executor, types
 
-from aiogram.types import ChatPermissions
 
 from Bot.Infrastructure.DataBase.Connector import database_connect
 from Bot.Telegram.Connection import bot_connect
 from Bot.Infrastructure.DataBase.commands import append_message, get_messages, add_chat, drop_chat, get_flood_status, \
     update_flood_status
 from Bot.Detector.Flood.FloodDetector import FloodDetector
-from Bot.Detector.Flood.reaction import react_to_flood_message
 from Bot.Detector.NSFW.detection import check_message_to_nsfw
 from Bot.Detector.Corrector import Corrector
 from datetime import timedelta
 
 dp = bot_connect()
+detector = FloodDetector()
 
 
 @dp.message_handler(commands="test1")
@@ -33,85 +32,54 @@ async def some_handler(my_chat_member: types.ChatMemberUpdated):
             pass
         else:
             add_chat(connection, my_chat_member.chat.id, my_chat_member.chat.title, 0)
-
     # todo check username when he join to chat, check user by spamlist
 
 
 @dp.message_handler()
 async def message_read(message: types.Message):
     try:
+        corrector = Corrector(connection, dp.bot, message.chat.id)
         if message.reply_to_message is not None and message.text.lower() == "@violation_detect_bot":
-            messages, ids = get_messages(connection, message.reply_to_message.from_user.id,
-                                         message.reply_to_message.chat.id, is_deleted=0)
-            delta = timedelta(
-                #days = 50,
-                #seconds = 27,
-                #microseconds = 10,
-                #milliseconds = 29000,
-                minutes=1,
-                #hours = 8,
-                #weeks = 2
-            )
-            #await dp.bot.ban_chat_member(message.reply_to_message.chat.id, message.reply_to_message.from_user.id, delta)
-
-            new_permissions = ChatPermissions(can_pin_messages=False,
-                                              can_send_polls=False,
-                                              can_send_media_messages=False,
-                                              can_invite_users=False,
-                                              can_send_other_messages=False,
-                                              can_send_messages=False,
-                                              can_change_info=False,
-                                              can_add_web_page_previews=False)
-            member = await dp.bot.get_chat_member(message.reply_to_message.chat.id,
-                                              message.reply_to_message.from_user.id)
-            print(member.status)
-            #message.reply_to_message.from_user.id
-            await dp.bot.restrict_chat_member(message.reply_to_message.chat.id,
-                                              message.reply_to_message.from_user.id,
-                                              until_date=delta,
-                                              permissions=new_permissions)
-            #                                              permissions=new_permissions,
-
-            print(message.reply_to_message.chat.id, message.reply_to_message.from_user.id)
-
-            detector = FloodDetector()
-            is_flood_status, flood_messages_ids = detector.compare_messages_to_flood_detect(messages)  # todo check images for flood
-            if is_flood_status:
-                corrector = Corrector(connection, dp.bot, message.chat.id)
-                #await corrector._delete_messages(flood_messages_ids)
-                #for id1 in ids1:
-                #    await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])
+            messages_texts, messages_ids = get_messages(connection, message.reply_to_message.from_user.id,
+                                                        message.reply_to_message.chat.id, is_deleted=0)
+            is_messages_has_flood, messages_with_flood_ids = detector.compare_messages_to_flood_detect(
+                messages_texts)  # todo check images for flood
+            if is_messages_has_flood:
+                await corrector.react_to_violation(messages=np.array(messages_ids)[messages_with_flood_ids],
+                                                   delete_messages=True, restrict_reason='Flood message')
     except Exception as e:
         print(e)
-
     try:
         if get_flood_status(connection, message.chat.id):
-            messages, ids = get_messages(connection, message.from_user.id, message.chat.id, 20)
-            detector = FloodDetector()
-            status, ids1 = detector.compare_message_to_flood_detect(messages, message.text, similarity_coefficient=0.25)
-            if status:
-                for id1 in ids1:
-                    await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])
-                await react_to_flood_message(connection, dp.bot, message.chat.id, message.message_id)
+            messages_texts, messages_ids = get_messages(connection, message.from_user.id, message.chat.id, 20, is_deleted=0)
+            is_messages_has_flood, messages_with_flood_ids = detector.compare_message_to_flood_detect(messages_texts,
+                                                                                                      message.text,
+                                                                                                      similarity_coefficient=0.25)
+            messages_ids.insert(0, message.message_id)
+            if is_messages_has_flood:
+                await corrector.react_to_violation(messages=np.array(messages_ids)[messages_with_flood_ids],
+                                                   delete_messages=True, restrict_reason='Flood message')
         else:
-            messages, ids = get_messages(connection, message.from_user.id,
-                                         message.chat.id, 30)
-            status, ids1 = detector.compare_message_to_flood_detect(messages, message.text, similarity_coefficient=0.75)
-            if status:
-                for id1 in ids1:
-                    await react_to_flood_message(connection, dp.bot, message.chat.id, ids[id1])
-                await react_to_flood_message(connection, dp.bot, message.chat.id, message.message_id)
+            messages_texts, messages_ids = get_messages(connection, message.from_user.id,
+                                         message.chat.id, 30, is_deleted=0)
+            is_messages_has_flood, messages_with_flood_ids = detector.compare_message_to_flood_detect(messages_texts,
+                                                                                                      message.text,
+                                                                                                      similarity_coefficient=0.75)
+            messages_ids.insert(0, message.message_id)
+            if is_messages_has_flood:
+                await corrector.react_to_violation(messages=np.array(messages_ids)[messages_with_flood_ids],
+                                                   delete_messages=True, restrict_reason='Flood message')
             update_flood_status(connection, message.chat.id, 1)
-    except:
-        pass
+    except Exception as e:
+        print(e)
     if check_message_to_nsfw(message.text):
         await message.reply('NSFW!')
     try:
         append_message(connection, message.chat.id, message.from_user.id, message.text, message.message_id, 0,
                        message.date.year + message.date.month * 12 + message.date.day * 31 + message.date.hour * 24 +
                        message.date.minute)
-    except:
-        pass
+    except Exception as e:
+        print(e)
 
 
 if __name__ == '__main__':

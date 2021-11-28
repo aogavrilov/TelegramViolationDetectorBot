@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from mysql.connector import Error
 #todo SQL Injections Sequrity
+
 
 def show_databases(connection) -> []:
     with connection.cursor() as cursor:
@@ -11,7 +14,7 @@ def show_databases(connection) -> []:
                 databases.append(db)
             return databases
         except Error as e:
-            print(e)
+            print(e, ' in show_databases')
             return e
 
 
@@ -22,7 +25,7 @@ def create_database(connection, database_name: str) -> str:
             cursor.execute(command)
             return 0
         except Error as e:
-            print(e)
+            print(e, ' in create_database')
             return e
 
 
@@ -36,7 +39,7 @@ def append_message(connection, chat_id: int, user_id: int, message: str, message
             connection.commit()
             return 0
         except Error as e:
-            print(e)
+            print(e, ' in append_message')
             return e
 
 
@@ -60,7 +63,7 @@ def get_messages(connection, user_id, chat_id, limit=10, is_deleted=0) -> ([], [
 
 def get_count_of_messages_on_interval(connection, chat_id, interval) -> int:
     select_query = "SELECT COUNT(*) FROM messages WHERE chat_id = %s AND datetime < %s AND datetime > %s"
-    values = (chat_id, interval[0], interval[1])
+    values = (chat_id, interval[1], interval[0])
     try:
         with connection.cursor() as cursor:
             cursor.execute(select_query, values)
@@ -93,7 +96,7 @@ def update_flood_status(connection, chat_id, status) -> str:
             connection.commit()
             return 0
     except Error as e:
-        print(e)
+        print(e, ' in update_flood_status')
         return e
 
 
@@ -106,22 +109,21 @@ def update_chat_average_messages(connection, chat_id, value) -> str:
             connection.commit()
             return 0
         except Error as e:
-            print(e)
+            print(e, ' in update_chat_average_messages')
             return e
 
 
-def update_message_is_flood_status(connection, chat_id, message_id, is_flood) -> str:
+def update_message_is_deleted_status(connection, chat_id, message_id, is_deleted) -> str:
     command = "UPDATE messages SET is_deleted = %s WHERE chat_id = %s AND message_id = %s"
-    values = (is_flood, chat_id, message_id)
+    values = (str(is_deleted), str(chat_id), str(message_id))
     with connection.cursor() as cursor:
         try:
             cursor.execute(command, values)
             connection.commit()
             return 0
         except Error as e:
-            print(e)
+            print(e, ' in update_message_is_deleted_status')
             return e
-
 
 
 def add_chat(connection, chat_id, title, bot_status):
@@ -133,7 +135,7 @@ def add_chat(connection, chat_id, title, bot_status):
             connection.commit()
             return 0
         except Error as e:
-            print(e)
+            print(e, ' in add chat')
             return e
 
 
@@ -145,7 +147,7 @@ def drop_chat(connection, chat_id):
             connection.commit()
             return 0
         except Error as e:
-            print(e)
+            print(e, ' in drop_chat')
             return e
 
 
@@ -161,6 +163,23 @@ def get_chats(connection):
         return chats
     except():
         return chats
+
+
+def write_incident(connection, chat_id, user_id, applied_action, incident_type, incident_proofs):
+    command = "INSERT INTO incidents(chat_id, user_id, action, incident_type, incident_values, datetime) VALUES " \
+              "(%s, %s, %s, %s, %s, %s)"
+    now = datetime.now()
+    values = (chat_id, user_id, applied_action, incident_type, incident_proofs, str(now))
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(command, values)
+            connection.commit()
+            return 0
+        except Error as e:
+            print(e, ' in write incident')
+            return e
+    pass
+
 
 """
 def create_table(connection, database_name: str, table_name: str) -> str:

@@ -1,6 +1,7 @@
 import numpy as np
 from aiogram import executor, types
-
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
 
 from Bot.Infrastructure.DataBase.Connector import database_connect
 from Bot.Telegram.Connection import bot_connect
@@ -9,15 +10,131 @@ from Bot.Infrastructure.DataBase.commands import append_message, get_messages, a
 from Bot.Detector.Flood.FloodDetector import FloodDetector
 from Bot.Detector.NSFW.detection import check_message_to_nsfw
 from Bot.Detector.Corrector import Corrector
-from datetime import timedelta
 
 dp = bot_connect()
 detector = FloodDetector()
 
 
-@dp.message_handler(commands="test1")
-async def cmd_test(message: types.Message):
-    await message.reply("Test1")
+class SetPunishmentSettings(StatesGroup):
+    waiting_for_writing_chat_id = State()
+    waiting_for_add_triggers = State()
+    waiting_for_set_punishments = State()
+
+
+@dp.message_handler(commands="start")
+async def start_dialog(message: types.Message):
+    poll_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    poll_keyboard.add(types.KeyboardButton("About"))
+    poll_keyboard.add(types.KeyboardButton("Punishment settings"))
+    poll_keyboard.add(types.KeyboardButton("Incidents logs"))
+    poll_keyboard.add(types.KeyboardButton("Cancel"))
+    await message.answer("Select action", reply_markup=poll_keyboard)
+
+
+@dp.message_handler()
+async def echo(message: types.Message):
+    if message.text == "About":
+        await message.answer("This bot can help you moderate your channel with Russian messages.\n "
+                             "You need to make bot administrator for detecting NSFW and react on it.\n"
+                             "If you make him administrator than you also need set punishment settings\n"
+                             "You can view all applied actions in Incidents logs\n"
+                             "If you don't make him administrator he will collect incidents to logs and "
+                             "it can helps him to become better."
+                             "\n\nДанный бот упрощает модерирование канала.\n"
+                             "На текущий момент поддерживаются такие функции, как детектирование оскорблений/угроз/мата"
+                             " в сообщении, фильтрация фото на предмет непристойности, детекция флуда.\n"
+                             "- Для того, чтобы бот мог модерировать канал, необходимо сделать его администратором и "
+                             "выставить настройки реакций на каждый из видов нарушений\n"
+                             "- Все инциденты и примененные наказания записываются и могут быть показаны по кнопке "
+                             "''Incidents logs''\n"
+                             "- Если вы оставите бота без прав администрирования, то бот не будет модерировать канал, "
+                             "но это поможет боту улучшать качество классификации"
+
+
+                             )
+    elif message.text == "Punishment settings":
+        await message.answer("На текущий момент поддерживаются функции детекции:\n 1. Оскорблений\n 2. Угроз\n "
+                             "3. Непристойностей\n 4. Флуда сообщениями")
+        await message.answer("Введите список необходимых функций детекции в формате ''<Номер функции>. <True/False> "
+                             "<Переход на новую строку>'', где True означает необходимость включения данного "
+                             "классификатора, а False обозначает "
+                             "отсутствие необходимости.\n Пример приведен ниже:")
+        await message.answer("1. True\n2. True\n3. False\n4. True")
+        await message.answer("В приведенном выше примере включена поддержка детекции оскорблений, угроз и флуда, "
+                             "но выключена модерация непристойностей")
+
+    elif (message.text == "Style Transfer"):
+        pass
+
+    elif (message.text == "Отмена"):
+        tmp = types.ReplyKeyboardRemove()
+        await message.answer(
+            "Спасибо, что воспользовались нашим приложением. Вы всегда можете ввести /start и продолжить развлекаться.",
+            reply_markup=tmp)
+
+    else:
+        await message.answer("Данная команда неизвестна. Введите /start для отображения меню.")
+        print(message.text)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @dp.my_chat_member_handler()

@@ -14,15 +14,4 @@ def database_connect() -> mysql.connector:
     except:
         connection = None
     return connection
-"""    try:
-        with connect(
-                host=config["Database"]["host"],
-                user=config["Database"]["user"],
-                password=config["Database"]["password"],
-                database=config["Database"]["db_name"],
-        ) as connection:
-            print(connection)
-            return connection
-    except Error as e:
-        print(e)"""
 

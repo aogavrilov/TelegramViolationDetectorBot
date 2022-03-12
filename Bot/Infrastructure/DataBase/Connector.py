@@ -11,7 +11,10 @@ def database_connect() -> mysql.connector:
                     user=config["Database"]["user"],
                     password=config["Database"]["password"],
                     database=config["Database"]["db_name"])
-    except:
+        print("DB connected in DataBase/Connector")
+    except Exception as e:
+        print(e)
+
         connection = None
     return connection
 

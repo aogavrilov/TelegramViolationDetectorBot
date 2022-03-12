@@ -1,6 +1,11 @@
 from datetime import datetime
 
 from mysql.connector import Error
+
+import logging
+
+logging.basicConfig(filename="logs/db.log", level=logging.INFO)
+log = logging.getLogger("ex")
 #todo SQL Injections Sequrity
 
 
@@ -14,7 +19,7 @@ def show_databases(connection) -> []:
                 databases.append(db)
             return databases
         except Error as e:
-            print(e, ' in show_databases')
+            log.exception(e, ' in show_databases')
             return e
 
 
@@ -25,22 +30,24 @@ def create_database(connection, database_name: str) -> str:
             cursor.execute(command)
             return 0
         except Error as e:
-            print(e, ' in create_database')
+            log.exception(e, ' in create_database')
             return e
 
 
 def append_message(connection, chat_id: int, user_id: int, message: str, message_id: int, is_flood: int, datetime: int) -> str:
-    command = "INSERT INTO messages(chat_id, user_id, message, message_id, is_flood, datetime, is_deleted) VALUES " \
-              "(%s, %s, %s, %s, %s, %s, 0)"
-    values = (chat_id, user_id, message, message_id, is_flood, datetime)
+
+    command = "INSERT INTO messages(chat_id, user_id, message, message_id, datetime, is_deleted) VALUES " \
+              "(%s, %s, %s, %s, %s, 0)"
+    values = (chat_id, user_id, message, message_id, datetime)
     with connection.cursor() as cursor:
         try:
             cursor.execute(command, values)
             connection.commit()
             return 0
         except Error as e:
-            print(e, ' in append_message')
+            log.exception(e, ' in append_message')
             return e
+
 
 
 def get_messages(connection, user_id, chat_id, limit=10, is_deleted=0) -> ([], []):
@@ -96,7 +103,7 @@ def update_flood_status(connection, chat_id, status) -> str:
             connection.commit()
             return 0
     except Error as e:
-        print(e, ' in update_flood_status')
+        log.exception(e, ' in update_flood_status')
         return e
 
 
@@ -109,7 +116,7 @@ def update_chat_average_messages(connection, chat_id, value) -> str:
             connection.commit()
             return 0
         except Error as e:
-            print(e, ' in update_chat_average_messages')
+            log.exception(e, ' in update_chat_average_messages')
             return e
 
 
@@ -122,7 +129,7 @@ def update_message_is_deleted_status(connection, chat_id, message_id, is_deleted
             connection.commit()
             return 0
         except Error as e:
-            print(e, ' in update_message_is_deleted_status')
+            log.exception(e, ' in update_message_is_deleted_status')
             return e
 
 
@@ -135,7 +142,7 @@ def add_chat(connection, chat_id, title, bot_status):
             connection.commit()
             return 0
         except Error as e:
-            print(e, ' in add chat')
+            log.exception(e, ' in add chat')
             return e
 
 
@@ -147,7 +154,7 @@ def drop_chat(connection, chat_id):
             connection.commit()
             return 0
         except Error as e:
-            print(e, ' in drop_chat')
+            log.exception(e, ' in drop_chat')
             return e
 
 
@@ -176,7 +183,7 @@ def write_incident(connection, chat_id, user_id, applied_action, incident_type, 
             connection.commit()
             return 0
         except Error as e:
-            print(e, ' in write incident')
+            log.exception(e, ' in write incident')
             return e
     pass
 

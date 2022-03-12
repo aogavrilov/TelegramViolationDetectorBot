@@ -1,5 +1,4 @@
 import array
-import collections
 
 import numpy as np
 from scipy.stats import stats
@@ -10,8 +9,8 @@ class FloodDetector:
         """
         Class for flood detection in messages
 
-        :param FLOOD_COMPARE_CONST:
-            Limit sum of correlation(similarity) between messages after which methods indicates that messages have flood.
+        :param FLOOD_COMPARE_CONST: Limit sum of correlation(similarity) between messages after which methods
+        indicates that messages have flood.
 
         Methods:
         --------

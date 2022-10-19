@@ -62,15 +62,24 @@ class Corrector:
 
     async def _delete_messages(self, message_ids: [], restrict_reason: str, incident_proofs: str = "None") -> None:
         """Delete messages from chat"""
-        for message_id in message_ids:
-            await self.bot.delete_message(self.chat_id, message_id)
-            update_message_is_deleted_status(connection=self.connection, chat_id=self.chat_id, message_id=message_id, is_deleted=1)
-        write_incident(self.connection,
-                       self.chat_id,
-                       user_id=-1,
-                       applied_action="Delete Messages",
-                       incident_type=restrict_reason,
-                       incident_proofs=incident_proofs)
+        try:
+            for message_id in message_ids:
+                await self.bot.delete_message(self.chat_id, message_id)
+                update_message_is_deleted_status(connection=self.connection, chat_id=self.chat_id, message_id=message_id, is_deleted=1)
+            write_incident(self.connection,
+                           self.chat_id,
+                           user_id=-1,
+                           applied_action="Delete Messages",
+                           incident_type=restrict_reason,
+                           incident_proofs=incident_proofs)
+        except Exception as e:
+            write_incident(self.connection,
+                           self.chat_id,
+                           user_id=-1,
+                           applied_action="Try to Delete Message, but got exception: " + str(e),
+                           incident_type=restrict_reason,
+                           incident_proofs=incident_proofs)
+
 
     async def _ban_sending_media(self, user_id: int,
                                  restrict_reason: str,

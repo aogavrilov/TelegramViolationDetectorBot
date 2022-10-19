@@ -68,6 +68,28 @@ def get_messages(connection, user_id, chat_id, limit=10, is_deleted=0) -> ([], [
         return messages, ids
 
 
+def get_nsfw_messages(connection, chat_id=None, limit=100):
+    if chat_id is None:
+        select_query = "SELECT message, message_id FROM messages AS msgs INNER JOIN incidents AS incdnts ON " \
+                       "msgs.message_id = incdnts.incident_values ORDER BY message_id DESC LIMIT = %s "
+        values = (limit)
+    else:
+        select_query = "SELECT message, message_id FROM messages AS msgs INNER JOIN incidents AS incdnts ON " \
+                       "msgs.message_id = incdnts.incident_values where incdnts.chat_id = %s ORDER BY " \
+                       "message_id DESC LIMIT = %s "
+        values = (chat_id, limit)
+    messages = []
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(select_query, values)
+            result = cursor.fetchall()
+            for row in result:
+                messages.append(row)
+        return messages
+    except():
+        return messages
+
+
 def get_count_of_messages_on_interval(connection, chat_id, interval) -> int:
     select_query = "SELECT COUNT(*) FROM messages WHERE chat_id = %s AND datetime < %s AND datetime > %s"
     values = (chat_id, interval[1], interval[0])

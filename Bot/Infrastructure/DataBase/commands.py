@@ -4,9 +4,13 @@ from mysql.connector import Error
 
 import logging
 
-logging.basicConfig(filename="logs/db.log", level=logging.INFO)
+from Bot.Infrastructure.Chats.ChatRules import ChatRules
+
+logging.basicConfig(filename="logs/db.logs", level=logging.INFO)
 log = logging.getLogger("ex")
-#todo SQL Injections Sequrity
+
+
+# todo SQL Injections Sequrity
 
 
 def show_databases(connection) -> []:
@@ -34,8 +38,8 @@ def create_database(connection, database_name: str) -> str:
             return e
 
 
-def append_message(connection, chat_id: int, user_id: int, message: str, message_id: int, is_flood: int, datetime: int) -> str:
-
+def append_message(connection, chat_id: int, user_id: int, message: str, message_id: int, is_flood: int,
+                   datetime: int) -> str:
     command = "INSERT INTO messages(chat_id, user_id, message, message_id, datetime, is_deleted) VALUES " \
               "(%s, %s, %s, %s, %s, 0)"
     values = (chat_id, user_id, message, message_id, datetime)
@@ -47,7 +51,6 @@ def append_message(connection, chat_id: int, user_id: int, message: str, message
         except Error as e:
             log.exception(e, ' in append_message')
             return e
-
 
 
 def get_messages(connection, user_id, chat_id, limit=10, is_deleted=0) -> ([], []):
@@ -107,7 +110,8 @@ def get_flood_status(connection, chat_id) -> str:
     select_query = "SELECT is_flood FROM chats WHERE chat_id = %s"
     try:
         with connection.cursor() as cursor:
-            cursor.execute(select_query, (chat_id,)) #todo сделать логгирование инцидентов в таблицы удаления пользователя,
+            cursor.execute(select_query,
+                           (chat_id,))  # todo сделать логгирование инцидентов в таблицы удаления пользователя,
             # мута пользователя, кика пользователя с описанием причины, вызвавшей инцидент
             result = cursor.fetchall()
             for row in result:
@@ -121,7 +125,8 @@ def update_flood_status(connection, chat_id, status) -> str:
     values = (status, chat_id)
     try:
         with connection.cursor() as cursor:
-            cursor.execute(select_query, values) #todo сделать логгирование инцидентов в таблицы удаления пользователя,
+            cursor.execute(select_query,
+                           values)  # todo сделать логгирование инцидентов в таблицы удаления пользователя,
             connection.commit()
             return 0
     except Error as e:
@@ -209,6 +214,60 @@ def write_incident(connection, chat_id, user_id, applied_action, incident_type, 
             return e
     pass
 
+
+def get_chat_rules(connection, obscenity_model, offense_model, threat_model, chat_id) -> str:
+    select_query = "SELECT on_obscenity, on_offense, on_threat, on_other_violation FROM chat_configs WHERE chat_id = %s"
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(select_query, (chat_id,))
+            result = cursor.fetchall()
+            for row in result:
+                return ChatRules(obscenity_model, offense_model, threat_model, on_obscenity=row[0],
+                                 on_offense=row[1], on_threat=row[2], on_other_violation=row[3])
+    except():
+        return ChatRules(obscenity_model, offense_model, threat_model, on_obscenity="0,0,0",
+                         on_offense="0,0,0", on_threat="0,0,0", on_other_violation="0,0,0")
+
+
+
+def get_count_of_chat_rules(connection, chat_id) -> int:
+    select_query = "SELECT COUNT(*) FROM chat_configs WHERE chat_id = %s"
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(select_query, (chat_id,))
+            result = cursor.fetchall()
+            for row in result:
+                return int(row[0])
+    except():
+        return 0
+
+def create_chat_rules(connection, chat_id, chat_rules: dict):
+    command = "INSERT INTO chat_configs(chat_id, on_obscenity, on_offense, on_other_violation, on_threat) VALUES " \
+              "(%s, %s, %s, %s, %s)"
+    values = (chat_id, chat_rules['obscenity'], chat_rules['offense'], chat_rules['other'], chat_rules['threat'])
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(command, values)
+            connection.commit()
+            return 0
+        except Error as e:
+            log.exception(e, ' in chat rules create incident')
+            return e
+    pass
+
+
+def update_chat_rules(connection, chat_id, chat_rules: dict) -> str:
+    command = "UPDATE chat_configs SET on_obscenity = %s, on_offense = %s, on_other_violation = %s, " \
+              "on_threat = %s  WHERE chat_id = %s"
+    values = (chat_rules['obscenity'], chat_rules['offense'], chat_rules['other'], chat_rules['threat'], chat_id)
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(command, values)
+            connection.commit()
+            return 0
+        except Error as e:
+            log.exception(e, ' in chat rules update')
+            return e
 
 """
 def create_table(connection, database_name: str, table_name: str) -> str:

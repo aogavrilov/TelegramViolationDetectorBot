@@ -6,7 +6,7 @@ import configparser
 def database_connect() -> mysql.connector:
     try:
         config = configparser.ConfigParser()
-        config.read("settings.ini")
+        config.read("Bot/Infrastructure/DataBase/settings.ini")
         connection = connect(host=config["Database"]["host"],
                     user=config["Database"]["user"],
                     password=config["Database"]["password"],

@@ -39,10 +39,10 @@ def create_database(connection, database_name: str) -> str:
 
 
 def append_message(connection, chat_id: int, user_id: int, message: str, message_id: int, is_flood: int,
-                   datetime: int) -> str:
-    command = "INSERT INTO messages(chat_id, user_id, message, message_id, datetime, is_deleted) VALUES " \
-              "(%s, %s, %s, %s, %s, 0)"
-    values = (chat_id, user_id, message, message_id, datetime)
+                   datetime: int, chat_name: str, user_name: str) -> str:
+    command = "INSERT INTO messages(chat_id, user_id, message, message_id, datetime, is_deleted, chat_name, user_name) VALUES " \
+              "(%s, %s, %s, %s, %s, 0, %s, %s)"
+    values = (chat_id, user_id, message, message_id, datetime, chat_name, user_name)
     with connection.cursor() as cursor:
         try:
             cursor.execute(command, values)

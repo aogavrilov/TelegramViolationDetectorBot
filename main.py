@@ -52,6 +52,7 @@ logging.basicConfig(filename="logs/main.logs", level=logging.INFO)
 log = logging.getLogger("ex")
 
 dp = bot_connect()
+
 detector = FloodDetector()
 
 
@@ -69,37 +70,55 @@ async def some_handler(my_chat_member: types.ChatMemberUpdated):
             add_chat(connection, my_chat_member.chat.id, my_chat_member.chat.title, 0)
     # todo check username when he join to chat, check user by spamlist
 
+"""
 
-@dp.message_handler()
+"""
+
+
+@dp.message_handler(content_types=types.ContentTypes.all())
 async def message_read(message: types.Message):
+    message_text = message.text
+
+    if message.sticker is not None:
+        message_text = '' + str(message.sticker.file_unique_id)
+    if message.dice is not None:
+        message_text = '' + str(message.dice.emoji)
+    if (message_text == 'NULL') or (message_text is None):
+        message_text = str('БезТекста')
     try:
-        append_message(connection, message.chat.id, message.from_user.id, message.text, message.message_id, 0,
+        append_message(connection, message.chat.id, message.from_user.id, message_text, message.message_id, 0,
                        message.date.year + message.date.month * 12 + message.date.day * 31 + message.date.hour * 24 +
-                       message.date.minute)
+                       message.date.minute, message.chat.title, str(message.from_user.first_name) + ' ' +
+                       str(message.from_user.last_name))
     except Exception as e:
-        log.exception(e)
-
-
-
-
+        try:
+            log.exception(e)
+        except Exception as e:
+            print(e)
 
 
 
     try:
         chat_rules = get_chat_rules(connection, obscenity_model, insult_model, threat_model, chat_id=message.chat.id)
+        if chat_rules is None:
+            chat_rules = ChatRules(obscenity_model, insult_model, threat_model, "0,0,0", "0,0,0", "0,0,0", "0,0,0")
+
     except Exception as e:
-        log.exception(e)
+        try:
+            log.exception(e)
+        except Exception as e:
+            print(e)
         chat_rules = ChatRules(obscenity_model, insult_model, threat_model, "0,0,0", "0,0,0", "0,0,0", "0,0,0")
 
     # Установка параметров бота
-    if "@violation_detect_bot" in message.text.lower() and "просмотр настроек бота для чата" in message.text.lower():
+    if "@violation_detect_bot" in message_text.lower() and "просмотр настроек бота для чата" in message_text.lower():
         member = await dp.bot.get_chat_member(message.chat.id, message.from_user.id)
         if member.status == "creator":
             await message.answer(chat_rules.show_settings())
-    if "@violation_detect_bot" in message.text.lower() and "установить настройки для чата" in message.text.lower():
+    if "@violation_detect_bot" in message_text.lower() and "установить настройки для чата" in message_text.lower():
         member = await dp.bot.get_chat_member(message.chat.id, message.from_user.id)
         if member.status == "creator":
-            result_code = chat_rules.from_text(message.text)
+            result_code = chat_rules.from_text(message_text)
             if result_code == 0:
                 await message.answer("Отправьте пожалуйста настройки в формате, который будет отправлен сообщением ниже:")
 
@@ -110,16 +129,12 @@ async def message_read(message: types.Message):
             await message.answer(chat_rules.show_settings())
 
 
-        #await message.answer(member)
-    #if "@violation_detect_bot Установить настройки для чата" in message.text.lower():
-
-
 
 
 
     # Check on flood when reply message
     try:
-        if message.reply_to_message is not None and message.text.lower() == "@violation_detect_bot":
+        if message.reply_to_message is not None and message_text.lower() == "@violation_detect_bot":
             messages_texts, messages_ids = get_messages(connection, message.reply_to_message.from_user.id,
                                                         message.reply_to_message.chat.id, is_deleted=0)
             is_messages_has_flood, messages_with_flood_ids = detector.compare_messages_to_flood_detect(
@@ -131,7 +146,10 @@ async def message_read(message: types.Message):
                                                    delete_messages=True,
                                                    restrict_reason='Flood message')
     except Exception as e:
-        log.exception(e)
+        try:
+            log.exception(e)
+        except Exception as e:
+            print(e)
 
 
     # Check on NSFW
@@ -144,7 +162,7 @@ async def message_read(message: types.Message):
                                                         is_deleted=0)
             is_messages_has_flood, messages_with_flood_ids = detector.compare_message_to_flood_detect(
                 messages_texts,
-                message.text,
+                message_text,
                 similarity_coefficient=0.25)
             messages_ids.insert(0, message.message_id)
             if is_messages_has_flood:
@@ -154,7 +172,7 @@ async def message_read(message: types.Message):
                                                    delete_messages=True,
                                                    restrict_reason='Flood message')
             else:
-                reaction = chat_rules.check_violation(message.text)
+                reaction = chat_rules.check_violation(message_text)
                 if reaction.sum() > 0:
                     corrector = Corrector(connection, dp.bot, message.chat.id)
                     await corrector.react_to_violation(user_id=message.from_user.id,
@@ -167,7 +185,7 @@ async def message_read(message: types.Message):
                                                         message.chat.id, 30, is_deleted=0)
             is_messages_has_flood, messages_with_flood_ids = detector.compare_message_to_flood_detect(
                 messages_texts,
-                message.text,
+                message_text,
                 similarity_coefficient=0.75)
             messages_ids.insert(0, message.message_id)
             if is_messages_has_flood:
@@ -177,7 +195,7 @@ async def message_read(message: types.Message):
                                                    restrict_reason='Flood message')
                 update_flood_status(connection, message.chat.id, 1)
             else:
-                reaction = chat_rules.check_violation(message.text)
+                reaction = chat_rules.check_violation(message_text)
                 if reaction.sum() > 0:
                     corrector = Corrector(connection, dp.bot, message.chat.id)
                     await corrector.react_to_violation(user_id=message.from_user.id,
@@ -186,14 +204,18 @@ async def message_read(message: types.Message):
                                                        delete_messages=reaction[0],
                                                        kick_user=reaction[2])
     except Exception as e:
-        log.exception(e)
+        try:
+            log.exception(e)
+        except Exception as e:
+            print(e)
 
 
 
+
+dp.register_message_handler(message_read, content_types=types.ContentTypes.all())
 
 if __name__ == '__main__':
     try:
-
         connection = database_connect()
         if connection is None:
             log.error('Database didn''t connect')

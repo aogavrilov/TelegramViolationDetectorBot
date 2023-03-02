@@ -12,7 +12,8 @@ nltk.download('stopwords')
 stopwords = stopwords.words("russian")
 model = joblib.load('Bot/Detector/NSFW/model/nbc_model.pkl')
 morph = MorphAnalyzer()
-
+from transformers import logging
+logging.set_verbosity_error()
 # BERT Tiny model
 
 bert_model = BertClassifier(

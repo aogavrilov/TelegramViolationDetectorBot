@@ -1,4 +1,5 @@
 import os
+import string
 
 import numpy as np
 from aiogram import executor, types
@@ -9,41 +10,40 @@ from Bot.Infrastructure.Chats.ChatRules import ChatRules
 from Bot.Infrastructure.DataBase.Connector import database_connect
 from Bot.Telegram.Connection import bot_connect
 from Bot.Infrastructure.DataBase.commands import append_message, get_messages, add_chat, drop_chat, get_flood_status, \
-    update_flood_status, get_chat_rules, get_count_of_chat_rules, update_chat_rules, create_chat_rules
+    update_flood_status, get_chat_rules, get_count_of_chat_rules, update_chat_rules, create_chat_rules, \
+    get_chat_banned_sticker_pack_names, add_pack_to_banned_stickers
 from Bot.Detector.Flood.FloodDetector import FloodDetector
 from Bot.Detector.NSFW.detection import check_message_to_nsfw
 from Bot.Detector.Corrector import Corrector
 from Bot.Detector.NSFW.model.bert.bert_classifier import BertClassifier
+from Bot.Detector.NSFW.image_detection import is_images_nsfw, is_gif_nsfw, is_video_nsfw
 import torch
+import datetime
 
 obscenity_model = BertClassifier(
-        model_path='cointegrated/rubert-tiny',
-        tokenizer_path='cointegrated/rubert-tiny',
-        n_classes=2,
-        model_save_path='obscenity_bert.pt',
+    model_path='cointegrated/rubert-tiny',
+    tokenizer_path='cointegrated/rubert-tiny',
+    n_classes=2,
+    model_save_path='obscenity_bert.pt',
 )
 obscenity_model.model = torch.load('Bot/Detector/NSFW/model/bert/obscenity_bert.pt', map_location=torch.device('cpu'))
 threat_model = BertClassifier(
-        model_path='cointegrated/rubert-tiny',
-        tokenizer_path='cointegrated/rubert-tiny',
-        n_classes=2,
-        model_save_path='obscenity_bert.pt',
+    model_path='cointegrated/rubert-tiny',
+    tokenizer_path='cointegrated/rubert-tiny',
+    n_classes=2,
+    model_save_path='obscenity_bert.pt',
 )
 threat_model.model = torch.load('Bot/Detector/NSFW/model/bert/threat_bert.pt', map_location=torch.device('cpu'))
 insult_model = BertClassifier(
-        model_path='cointegrated/rubert-tiny',
-        tokenizer_path='cointegrated/rubert-tiny',
-        n_classes=2,
-        model_save_path='obscenity_bert.pt',
+    model_path='cointegrated/rubert-tiny',
+    tokenizer_path='cointegrated/rubert-tiny',
+    n_classes=2,
+    model_save_path='obscenity_bert.pt',
 )
 insult_model.model = torch.load('Bot/Detector/NSFW/model/bert/insult_bert.pt', map_location=torch.device('cpu'))
 
-
-
-
-
-
 import logging
+
 try:
     os.mkdir("logs")
 except Exception as e:
@@ -70,6 +70,7 @@ async def some_handler(my_chat_member: types.ChatMemberUpdated):
             add_chat(connection, my_chat_member.chat.id, my_chat_member.chat.title, 0)
     # todo check username when he join to chat, check user by spamlist
 
+
 """
 
 """
@@ -77,7 +78,13 @@ async def some_handler(my_chat_member: types.ChatMemberUpdated):
 
 @dp.message_handler(content_types=types.ContentTypes.all())
 async def message_read(message: types.Message):
-    message_text = message.text
+    try:
+        if message.text is not None:
+            message_text = message.text
+            for punc_symbol in string.punctuation:
+                message_text = message_text.replace(punc_symbol, ' ' + punc_symbol + ' ')
+    except Exception as e:
+        print(e)
 
     if message.sticker is not None:
         message_text = '' + str(message.sticker.file_unique_id)
@@ -91,12 +98,19 @@ async def message_read(message: types.Message):
                        message.date.minute, message.chat.title, str(message.from_user.first_name) + ' ' +
                        str(message.from_user.last_name))
     except Exception as e:
+        log.exception(e)
+
+    if message.sticker is not None:
         try:
-            log.exception(e)
+            banned_pack_names = get_chat_banned_sticker_pack_names(connection, chat_id=message.chat.id)
+            if message.sticker.set_name in banned_pack_names:
+                corrector = Corrector(connection, dp.bot, message.chat.id)
+                await corrector.react_to_violation(messages=[message.message_id],
+                                                   mute_user=True,
+                                                   delete_messages=True,
+                                                   restrict_reason='Sticker from banned pack')
         except Exception as e:
-            print(e)
-
-
+            log.exception(e)
 
     try:
         chat_rules = get_chat_rules(connection, obscenity_model, insult_model, threat_model, chat_id=message.chat.id)
@@ -104,10 +118,7 @@ async def message_read(message: types.Message):
             chat_rules = ChatRules(obscenity_model, insult_model, threat_model, "0,0,0", "0,0,0", "0,0,0", "0,0,0")
 
     except Exception as e:
-        try:
-            log.exception(e)
-        except Exception as e:
-            print(e)
+        log.exception(e)
         chat_rules = ChatRules(obscenity_model, insult_model, threat_model, "0,0,0", "0,0,0", "0,0,0", "0,0,0")
 
     # Установка параметров бота
@@ -120,17 +131,29 @@ async def message_read(message: types.Message):
         if member.status == "creator":
             result_code = chat_rules.from_text(message_text)
             if result_code == 0:
-                await message.answer("Отправьте пожалуйста настройки в формате, который будет отправлен сообщением ниже:")
+                await message.answer(
+                    "Отправьте пожалуйста настройки в формате, который будет отправлен сообщением ниже:")
 
             if get_count_of_chat_rules(connection, message.chat.id) == 1:
                 update_chat_rules(connection, message.chat.id, chat_rules.get_str_dict())
             elif get_count_of_chat_rules(connection, message.chat.id) == 0:
                 create_chat_rules(connection, message.chat.id, chat_rules.get_str_dict())
             await message.answer(chat_rules.show_settings())
-
-
-
-
+    if message.reply_to_message is not None and \
+            message.reply_to_message.text == "@violation_detect_bot добавить стикерпак в банлист" and \
+            message.sticker is not None and message.from_user.id == message.reply_to_message.from_user.id:
+        member = await dp.bot.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status == "creator":
+            try:
+                add_pack_to_banned_stickers(connection, message.chat.id, str(message.sticker.set_name))
+                corrector = Corrector(connection, dp.bot, message.chat.id)
+                await corrector.react_to_violation(messages=np.array([message.reply_to_message.message_id, message.message_id]),
+                                                   mute_user=False,
+                                                   delete_messages=True,
+                                                   restrict_reason='Add new sticker pack to banned stickers')
+            except Exception as e:
+                log.exception(e)
+        #
 
     # Check on flood when reply message
     try:
@@ -150,7 +173,6 @@ async def message_read(message: types.Message):
             log.exception(e)
         except Exception as e:
             print(e)
-
 
     # Check on NSFW
     try:
@@ -203,6 +225,43 @@ async def message_read(message: types.Message):
                                                        mute_user=reaction[1],
                                                        delete_messages=reaction[0],
                                                        kick_user=reaction[2])
+
+        if message.photo is not None:
+            photos = []
+            for photo in message.photo:
+                file_name = photo.file_id
+                await photo.download('images/' + file_name)
+                photos.append(file_name)
+            is_nsfw = is_images_nsfw(photos)
+            if is_nsfw:
+                corrector = Corrector(connection, dp.bot, message.chat.id)
+                await corrector.react_to_violation(messages=[message.message_id],
+                                                   mute_user=True,
+                                                   delete_messages=True,
+                                                   restrict_reason='Message with nudes or porn images')
+        if message.video is not None:
+            file_name = message.video.file_name
+            await message.video.download('videos/' + file_name)
+            is_nsfw = is_video_nsfw([file_name])
+            if is_nsfw:
+                corrector = Corrector(connection, dp.bot, message.chat.id)
+                await corrector.react_to_violation(messages=[message.message_id],
+                                                   mute_user=True,
+                                                   delete_messages=True,
+                                                   restrict_reason='Message with nudes or porn video')
+
+        if (message.sticker is not None) and (message.sticker.is_video):
+            file_name = message.sticker.file_unique_id
+            await message.sticker.download('videos/' + file_name)
+            print(file_name)
+            is_nsfw = is_gif_nsfw([file_name])
+            if is_nsfw:
+                corrector = Corrector(connection, dp.bot, message.chat.id)
+                await corrector.react_to_violation(messages=[message.message_id],
+                                                   mute_user=True,
+                                                   delete_messages=True,
+                                                   restrict_reason='Message with nudes or porn sticker video')
+
     except Exception as e:
         try:
             log.exception(e)
@@ -210,9 +269,7 @@ async def message_read(message: types.Message):
             print(e)
 
 
-
-
-dp.register_message_handler(message_read, content_types=types.ContentTypes.all())
+#dp.register_message_handler(message_read, content_types=types.ContentTypes.all())
 
 if __name__ == '__main__':
     try:

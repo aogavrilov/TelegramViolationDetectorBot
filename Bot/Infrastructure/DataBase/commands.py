@@ -269,6 +269,34 @@ def update_chat_rules(connection, chat_id, chat_rules: dict) -> str:
             log.exception(e, ' in chat rules update')
             return e
 
+
+def get_chat_banned_sticker_pack_names(connection, chat_id) -> set:
+    select_query = "SELECT * FROM banned_sticker_packs WHERE chat_id = %s"
+    names = set()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(select_query, (chat_id, ))
+            result = cursor.fetchall()
+            for row in result:
+                names.add(row)
+        return names
+    except():
+        return names
+
+
+def add_pack_to_banned_stickers(connection, chat_id, pack_name: str):
+    command = "INSERT INTO banned_sticker_packs(chat_id, pack_name) VALUES (%s, %s)"
+    values = (chat_id, pack_name)
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(command, values)
+            connection.commit()
+            return 0
+        except Error as e:
+            log.exception(e, ' in chat add pack to banned stickers')
+            return e
+    pass
+
 """
 def create_table(connection, database_name: str, table_name: str) -> str:
     with connection.cursor() as cursor:

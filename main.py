@@ -101,6 +101,7 @@ async def message_read(message: types.Message):
         log.exception(e)
 
     if message.sticker is not None:
+        print(message)
         try:
             banned_pack_names = get_chat_banned_sticker_pack_names(connection, chat_id=message.chat.id)
             if message.sticker.set_name in banned_pack_names:
@@ -111,6 +112,7 @@ async def message_read(message: types.Message):
                                                    restrict_reason='Sticker from banned pack')
         except Exception as e:
             log.exception(e)
+            print(e)
 
     try:
         chat_rules = get_chat_rules(connection, obscenity_model, insult_model, threat_model, chat_id=message.chat.id)
@@ -230,8 +232,8 @@ async def message_read(message: types.Message):
             photos = []
             for photo in message.photo:
                 file_name = photo.file_id
-                await photo.download('images/' + file_name)
-                photos.append(file_name)
+                await photo.download('images/' + file_name + '.jpg')
+                photos.append(file_name + '.jpg')
             is_nsfw = is_images_nsfw(photos)
             if is_nsfw:
                 corrector = Corrector(connection, dp.bot, message.chat.id)
@@ -241,8 +243,8 @@ async def message_read(message: types.Message):
                                                    restrict_reason='Message with nudes or porn images')
         if message.video is not None:
             file_name = message.video.file_name
-            await message.video.download('videos/' + file_name)
-            is_nsfw = is_video_nsfw([file_name])
+            await message.video.download('videos/' + file_name + '.mp4')
+            is_nsfw = is_video_nsfw([file_name + '.mp4'])
             if is_nsfw:
                 corrector = Corrector(connection, dp.bot, message.chat.id)
                 await corrector.react_to_violation(messages=[message.message_id],
@@ -252,9 +254,9 @@ async def message_read(message: types.Message):
 
         if (message.sticker is not None) and (message.sticker.is_video):
             file_name = message.sticker.file_unique_id
-            await message.sticker.download('videos/' + file_name)
+            await message.sticker.download('videos/' + file_name + '.gif')
             print(file_name)
-            is_nsfw = is_gif_nsfw([file_name])
+            is_nsfw = is_gif_nsfw([file_name + '.gif'])
             if is_nsfw:
                 corrector = Corrector(connection, dp.bot, message.chat.id)
                 await corrector.react_to_violation(messages=[message.message_id],

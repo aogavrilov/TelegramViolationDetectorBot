@@ -278,7 +278,7 @@ def get_chat_banned_sticker_pack_names(connection, chat_id) -> set:
             cursor.execute(select_query, (chat_id, ))
             result = cursor.fetchall()
             for row in result:
-                names.add(row)
+                names.add(row[1])
         return names
     except():
         return names

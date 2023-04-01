@@ -24,9 +24,9 @@ def is_gif_nsfw(videos):
     for video in videos:
         try:
             path = video
-            os.environ['SKIP_N_FRAMES'] = "0"
-            predict = video_classifier.classify_video(path, batch_size=1)
-            print(predict)
+            os.environ['SKIP_N_FRAMES'] = "1"
+            predict = video_classifier.classify_video(path)
+            print('predict: ', predict)
             for pred_idx, pred in predict['preds'].items():
                 is_nsfw += (pred['unsafe'] > pred['safe'])
             os.remove(path)
@@ -41,7 +41,7 @@ def is_video_nsfw(videos):
         try:
             path = video
             os.environ['SKIP_N_FRAMES'] = "0.5"
-            predict = video_classifier.classify_video(path, batch_size=4)
+            predict = video_classifier.classify_video(path)
             print(predict)
             for pred_idx, pred in predict['preds'].items():
                 is_nsfw += (pred['unsafe'] > pred['safe'])
